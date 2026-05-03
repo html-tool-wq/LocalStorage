@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cloud Storage Mini</title>
+
+<style>
+/* ===== RESET + FONT ===== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: Arial, sans-serif;
+}
+
+body {
+  background: #f5f7fb;
+  color: #333;
+  padding: 20px;
+}
+
+/* ===== CONTAINER ===== */
+.container {
+  max-width: 1000px;
+  margin: auto;
+}
+
+/* ===== TITLE ===== */
+h1 {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+/* ===== DROP ZONE ===== */
+.drop-zone {
+  border: 2px dashed #4a90e2;
+  border-radius: 12px;
+  padding: 30px;
+  text-align: center;
+  background: #fff;
+  transition: 0.3s;
+  cursor: pointer;
+}
+
+.drop-zone.dragover {
+  background: #e3f2fd;
+}
+
+.drop-zone p {
+  margin: 10px 0;
+}
+
+/* ===== PROGRESS BAR ===== */
+.progress-container {
+  margin-top: 10px;
+  width: 100%;
+  height: 8px;
+  background: #ddd;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  width: 0%;
+  background: #4caf50;
+  transition: width 0.2s;
+}
+
+/* ===== FILE GRID ===== */
+.file-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 15px;
+  margin-top: 20px;
+}
+
+/* ===== FILE CARD ===== */
+.file-card {
+  background: white;
+  padding: 10px;
+  border-radius: 10px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+  text-align: center;
+}
+
+.file-icon {
+  font-size: 40px;
+}
+
+.file-name {
+  font-size: 14px;
+  margin: 5px 0;
+  word-break: break-all;
+}
+
+/* ===== BUTTONS ===== */
+.btn {
+  border: none;
+  padding: 5px 10px;
+  margin: 3px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.download {
+  background: #4caf50;
+  color: white;
+}
+
+.delete {
+  background: #f44336;
+  color: white;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 600px) {
+  .drop-zone {
+    padding: 20px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <h1>☁️ Cloud Storage Mini</h1>
+
+  <!-- DROP ZONE -->
+  <div class="drop-zone" id="dropZone">
+    <p>Kéo & thả file vào đây</p>
+    <p>hoặc click để chọn file</p>
+    <input type="file" id="fileInput" hidden multiple>
+    
+    <div class="progress-container">
+      <div class="progress-bar" id="progressBar"></div>
+    </div>
+  </div>
+
+  <!-- FILE LIST -->
+  <div class="file-grid" id="fileList"></div>
+</div>
+
+<script>
+// ===== BIẾN CHUNG =====
+const dropZone = document.getElementById("dropZone");
+const fileInput = document.getElementById("fileInput");
+const fileList = document.getElementById("fileList");
+const progressBar = document.getElementById("progressBar");
+
+// ===== LOAD DATA TỪ LOCALSTORAGE =====
+let files = JSON.parse(localStorage.getItem("files") || "[]");
+renderFiles();
+
+// ===== CLICK CHỌN FILE =====
+dropZone.addEventListener("click", () => fileInput.click());
+
+fileInput.addEventListener("change", (e) => {
+  handleFiles(e.target.files);
+});
+
+// ===== DRAG & DROP =====
+dropZone.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  dropZone.classList.add("dragover");
+});
+
+dropZone.addEventListener("dragleave", () => {
+  dropZone.classList.remove("dragover");
+});
+
+dropZone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dropZone.classList.remove("dragover");
+  handleFiles(e.dataTransfer.files);
+});
+
+// ===== XỬ LÝ FILE =====
+function handleFiles(fileListInput) {
+  const fileArray = Array.from(fileListInput);
+
+  fileArray.forEach(file => {
+    simulateUpload(file);
+  });
+}
+
+// ===== GIẢ LẬP UPLOAD =====
+function simulateUpload(file) {
+  let progress = 0;
+
+  const interval = setInterval(() => {
+    progress += 10;
+    progressBar.style.width = progress + "%";
+
+    if (progress >= 100) {
+      clearInterval(interval);
+      progressBar.style.width = "0%";
+
+      saveFile(file);
+    }
+  }, 100);
+}
+
+// ===== LƯU FILE =====
+function saveFile(file) {
+  const reader = new FileReader();
+
+  reader.onload = function(e) {
+    const base64 = e.target.result;
+
+    const fileData = {
+      id: Date.now(),
+      name: file.name,
+      type: file.type,
+      data: base64
+    };
+
+    files.push(fileData);
+    localStorage.setItem("files", JSON.stringify(files));
+
+    renderFiles();
+  };
+
+  // Chỉ đọc file nhỏ (tránh lag)
+  if (file.size < 2 * 1024 * 1024) {
+    reader.readAsDataURL(file);
+  } else {
+    alert("File quá lớn (>2MB) không lưu được!");
+  }
+}
+
+// ===== HIỂN THỊ FILE =====
+function renderFiles() {
+  fileList.innerHTML = "";
+
+  files.forEach(file => {
+    const div = document.createElement("div");
+    div.className = "file-card";
+
+    // ICON PHÂN LOẠI
+    let icon = "📄";
+    if (file.type.startsWith("image")) icon = "🖼️";
+    else if (file.type.startsWith("video")) icon = "🎬";
+
+    div.innerHTML = `
+      <div class="file-icon">${icon}</div>
+      <div class="file-name">${file.name}</div>
+      <button class="btn download" onclick="downloadFile('${file.id}')">Download</button>
+      <button class="btn delete" onclick="deleteFile('${file.id}')">Delete</button>
+    `;
+
+    fileList.appendChild(div);
+  });
+}
+
+// ===== DOWNLOAD =====
+function downloadFile(id) {
+  const file = files.find(f => f.id == id);
+
+  const a = document.createElement("a");
+  a.href = file.data;
+  a.download = file.name;
+  a.click();
+}
+
+// ===== DELETE =====
+function deleteFile(id) {
+  files = files.filter(f => f.id != id);
+  localStorage.setItem("files", JSON.stringify(files));
+  renderFiles();
+}
+</script>
+
+</body>
+</html>
